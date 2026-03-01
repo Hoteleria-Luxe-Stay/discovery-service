@@ -8,7 +8,7 @@ Servidor de descubrimiento de servicios basado en **Netflix Eureka**. Actúa com
 |-----------|-------|
 | Puerto | 8761 |
 | Java | 21 |
-| Spring Boot | 3.5.7 |
+| Spring Boot | 3.4.0 |
 | Spring Cloud | 2024.0.1 |
 | Dashboard | http://localhost:8761 |
 
@@ -76,61 +76,23 @@ GET http://localhost:8761/eureka/apps/{app-name}
 ### Dockerfile
 
 ```dockerfile
-# Dockerfile
-FROM eclipse-temurin:21-jdk-alpine AS builder
-
+FROM maven:3.9-eclipse-temurin-21-alpine AS builder
 WORKDIR /app
-
-# Copiar archivos de Maven
 COPY pom.xml .
-COPY .mvn .mvn
-COPY mvnw .
-
-# Descargar dependencias
-RUN chmod +x mvnw && ./mvnw dependency:go-offline -B
-
-# Copiar código fuente
+RUN mvn dependency:go-offline -B
 COPY src ./src
+RUN mvn clean package -DskipTests -B
 
-# Compilar aplicación
-RUN ./mvnw clean package -DskipTests
-
-# Imagen de producción
 FROM eclipse-temurin:21-jre-alpine
-
 WORKDIR /app
-
-# Crear usuario no-root
 RUN addgroup -S spring && adduser -S spring -G spring
+COPY --from=builder /app/target/*.jar app.jar
 USER spring:spring
-
-# Copiar JAR desde builder
-COPY --from=builder /app/target/discovery-service-*.jar app.jar
-
-# Puerto
 EXPOSE 8761
-
-# Health check
+ENV JAVA_OPTS="-Xms256m -Xmx512m"
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8761/actuator/health || exit 1
-
-# Ejecutar
-ENTRYPOINT ["java", "-jar", "app.jar"]
-```
-
-### Dockerfile (Simple)
-
-```dockerfile
-# Dockerfile.simple
-FROM eclipse-temurin:21-jre-alpine
-
-WORKDIR /app
-
-COPY target/discovery-service-*.jar app.jar
-
-EXPOSE 8761
-
-ENTRYPOINT ["java", "-jar", "app.jar"]
+  CMD wget --no-verbose --tries=1 --spider http://localhost:8761/actuator/health || exit 1
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
 ```
 
 ### docker-compose.yml
@@ -149,7 +111,7 @@ services:
       - "8761:8761"
     environment:
       - SERVER_PORT=8761
-      - SPRING_PROFILES_ACTIVE=docker
+      - JAVA_OPTS=-Xms256m -Xmx512m
     networks:
       - hotel-network
     healthcheck:
@@ -178,6 +140,7 @@ services:
       - "8888:8888"
     environment:
       - SERVER_PORT=8888
+      - CONFIG_REPO_URI=https://github.com/tu-usuario/config-repo.git
     networks:
       - hotel-network
     healthcheck:
@@ -218,7 +181,7 @@ networks:
 
 ```bash
 # Compilar el proyecto
-./mvnw clean package -DskipTests
+mvn clean package -DskipTests
 
 # Construir imagen
 docker build -t discovery-service:latest .
@@ -491,7 +454,7 @@ export AKS_CLUSTER="aks-hotel-reservas"
 az acr login --name $ACR_NAME
 
 # Opción 1: Build local y push
-./mvnw clean package -DskipTests
+mvn clean package -DskipTests
 docker build -t $ACR_NAME.azurecr.io/discovery-service:v1.0.0 .
 docker push $ACR_NAME.azurecr.io/discovery-service:v1.0.0
 
@@ -800,13 +763,13 @@ curl -H "Accept: application/json" http://localhost:8761/eureka/apps
 
 ```bash
 # Compilar
-./mvnw clean package -DskipTests
+mvn clean package -DskipTests
 
 # Ejecutar
 java -jar target/discovery-service-1.0.0-SNAPSHOT.jar
 
 # O con Maven
-./mvnw spring-boot:run
+mvn spring-boot:run
 
 # Verificar
 curl http://localhost:8761/actuator/health
