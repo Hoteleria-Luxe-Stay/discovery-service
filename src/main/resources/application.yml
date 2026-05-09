@@ -4,6 +4,11 @@ server:
 spring:
   application:
     name: discovery-service
+  security:
+    user:
+      name: ${EUREKA_USER:eureka-admin}
+      password: ${EUREKA_PASSWORD:dev-only-pass-change-me}
+      roles: EUREKA_CLIENT
 
 eureka:
   client:
