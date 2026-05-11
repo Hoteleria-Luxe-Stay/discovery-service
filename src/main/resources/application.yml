@@ -14,6 +14,15 @@ eureka:
   client:
     register-with-eureka: false
     fetch-registry: false
+    # Self-replication necesita creds embebidas para evitar 401 al replicar a si mismo
+    # (single instance, no hay peers reales pero Eureka intenta usar localhost:8761 default).
+    service-url:
+      defaultZone: http://${EUREKA_USER:eureka-admin}:${EUREKA_PASSWORD:dev-only-pass-change-me}@localhost:8761/eureka/
+  server:
+    # Single instance: desactivar self-preservation y peer sync para limpiar logs.
+    enable-self-preservation: false
+    registry-sync-retries: 0
+    peer-node-read-timeout-ms: 1000
 
 # ============================================================================
 # Observability (Round 10) — management endpoints + Micrometer + OTel SDK
